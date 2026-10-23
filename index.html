@@ -1,0 +1,280 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Panic | Digital Detective</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">PRIVACY <span>PANIC</span></div>
+    <div class="case-status">DIGITAL DETECTIVE TRAINING</div>
+  </header>
+
+  <main class="container">
+    <section id="home-screen" class="screen active">
+      <p class="eyebrow">INTERACTIVE CYBERSECURITY CASE FILE</p>
+      <h1>Can you protect<br><span class="accent">the evidence?</span></h1>
+      <p class="intro">
+        An app is collecting user information, but something isn't right.
+        Solve puzzles, trace data pathways, and make decisions before private
+        information gets exposed.
+      </p>
+
+      <div class="mission-card">
+        <div class="mission-icon">⌕</div>
+        <div>
+          <h2>Your mission</h2>
+          <p>Investigate the app, identify unnecessary data collection, and keep user information safe.</p>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div><strong>04</strong><span>CASE FILES</span></div>
+        <div><strong>01</strong><span>FINAL REVIEW</span></div>
+        <div><strong>∞</strong><span>WAYS TO FAIL</span></div>
+      </div>
+
+      <button id="start-button" class="primary-button">START INVESTIGATION →</button>
+      <p class="small-note">Your choices affect your final privacy score.</p>
+    </section>
+
+    <section id="game-screen" class="screen">
+      <div class="game-heading">
+        <div>
+          <p id="chapter-label" class="eyebrow">CASE 01 / 04</p>
+          <h1 id="chapter-title">Crack the Key</h1>
+        </div>
+        <div class="score-pill">SCORE <strong id="score-display">0</strong></div>
+      </div>
+
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+
+      <section id="case-wordle" class="case-panel">
+        <p class="case-tag">CASE 01 — ENCRYPTION KEY</p>
+        <h2>Someone locked the evidence.</h2>
+        <p>
+          The app's evidence file is encrypted. You need to discover the five-letter
+          key before you can inspect it.
+        </p>
+
+        <div class="clue-card">
+          <span class="clue-symbol">?</span>
+          <div>
+            <strong>DECRYPTION CLUE</strong>
+            <p>
+              A secure app should earn this from its users. It is easy to lose,
+              difficult to rebuild, and essential when people share private information.
+              What is the five-letter word?
+            </p>
+          </div>
+        </div>
+
+        <div id="wordle-board" class="wordle-board" aria-label="Password puzzle"></div>
+        <div id="wordle-keyboard" class="wordle-keyboard" aria-label="Letter feedback keyboard"></div>
+
+        <p id="wordle-message" class="feedback" aria-live="polite">
+          Enter a five-letter guess to begin.
+        </p>
+
+        <div class="button-row">
+          <button id="wordle-reset" class="secondary-button">RESET PUZZLE</button>
+          <button id="wordle-submit" class="primary-button">SUBMIT GUESS</button>
+        </div>
+
+        <div id="key-explanation" class="explanation hidden">
+          <h3>How the key was discovered</h3>
+          <p>
+            The computer checks your guess against the secret word one letter at a time.
+            Green means a letter is in the correct position, yellow means the letter
+            exists elsewhere in the word, and gray means the letter is not available
+            in the answer (or has already been accounted for).
+          </p>
+          <p>
+            This is a logic puzzle inspired by password and encryption concepts.
+            Real encryption uses mathematical algorithms and cryptographic keys;
+            it is not normally broken by guessing a word from a clue.
+          </p>
+          <button id="wordle-continue" class="primary-button">OPEN THE EVIDENCE →</button>
+        </div>
+      </section>
+
+      <section id="case-cords" class="case-panel hidden">
+        <p class="case-tag">CASE 02 — DATA PATHWAYS</p>
+        <h2>Connect only what is necessary.</h2>
+        <p>
+          The app wants to connect information sources to its features. Select a source
+          on the left, then select the feature that needs it on the right. Click a
+          connection to remove it. Every extra pathway creates another opportunity for
+          information to be exposed.
+        </p>
+
+        <div class="clue-card">
+          <span class="clue-symbol">!</span>
+          <div>
+            <strong>INVESTIGATOR'S RULE</strong>
+            <p>
+              A feature should receive only the information it needs to work.
+              More data is not automatically better.
+            </p>
+          </div>
+        </div>
+
+        <div id="cord-workspace" class="cord-workspace">
+          <svg id="cord-svg" class="cord-svg" aria-hidden="true"></svg>
+          <div class="cord-column">
+            <h3>INFORMATION SOURCES</h3>
+            <button class="cord-node source-node" data-source="email">Email address</button>
+            <button class="cord-node source-node" data-source="display">Display name</button>
+            <button class="cord-node source-node" data-source="contacts">Phone contacts</button>
+            <button class="cord-node source-node" data-source="location">Location history</button>
+            <button class="cord-node source-node" data-source="microphone">Microphone access</button>
+          </div>
+          <div class="cord-column">
+            <h3>APP FEATURES</h3>
+            <button class="cord-node target-node" data-target="recovery">Account recovery</button>
+            <button class="cord-node target-node" data-target="profile">Public profile</button>
+            <button class="cord-node target-node" data-target="friends">Friend suggestions</button>
+            <button class="cord-node target-node" data-target="nearby">Nearby recommendations</button>
+            <button class="cord-node target-node" data-target="voice">Voice messages</button>
+          </div>
+        </div>
+
+        <p id="cord-selection" class="feedback" aria-live="polite">
+          Choose an information source to start a connection.
+        </p>
+        <div class="cord-legend">
+          <span><i class="legend-dot necessary"></i> Necessary connection</span>
+          <span><i class="legend-dot extra"></i> Unnecessary connection</span>
+        </div>
+
+        <div class="button-row">
+          <button id="cord-reset" class="secondary-button">CLEAR CONNECTIONS</button>
+          <button id="cord-submit" class="primary-button">CHECK MY DESIGN →</button>
+        </div>
+
+        <div id="cord-result" class="explanation hidden">
+          <h3 id="cord-result-title">Investigation results</h3>
+          <p id="cord-result-text"></p>
+          <p id="cord-result-score"></p>
+          <button id="cord-continue" class="primary-button">CONTINUE CASE →</button>
+        </div>
+      </section>
+
+      <section id="case-access" class="case-panel hidden">
+        <p class="case-tag">CASE 03 — PERMISSION CONTROL</p>
+        <h2>A request that doesn't add up.</h2>
+        <p>
+          A simple study-planner app asks for permission to access a user's location
+          all day, even when the app is closed.
+        </p>
+
+        <div class="scenario-card">
+          <span class="scenario-label">SYSTEM ALERT</span>
+          <p><strong>Requested permission:</strong> Always-on location tracking</p>
+          <p><strong>App's stated purpose:</strong> Organize homework deadlines</p>
+          <p><strong>Question:</strong> What should the user do?</p>
+        </div>
+
+        <div id="access-options" class="choice-list">
+          <button class="choice-button" data-choice="allow">
+            <span class="choice-letter">A</span>
+            Allow it. If the app asks, it must need it.
+          </button>
+          <button class="choice-button" data-choice="deny">
+            <span class="choice-letter">B</span>
+            Deny location access and use the planner without it.
+          </button>
+          <button class="choice-button" data-choice="limited">
+            <span class="choice-letter">C</span>
+            Check whether a limited permission is available and allow it only if a feature genuinely needs it.
+          </button>
+        </div>
+
+        <p id="access-feedback" class="feedback" aria-live="polite"></p>
+        <button id="access-continue" class="primary-button hidden">CONTINUE CASE →</button>
+      </section>
+
+      <section id="case-promise" class="case-panel hidden">
+        <p class="case-tag">CASE 04 — THE PRIVACY PROMISE</p>
+        <h2>The promise versus the truth.</h2>
+        <p>
+          A messaging app tells users, “Your private conversations stay private.”
+          Later, you discover that the app shares conversation metadata with advertisers
+          without clearly explaining this practice.
+        </p>
+
+        <div class="scenario-card alert-card">
+          <span class="scenario-label">EVIDENCE FOUND</span>
+          <p>
+            The app's public promise does not match its data-sharing behavior.
+            The team wants to quietly update its privacy policy and move on.
+          </p>
+        </div>
+
+        <div id="promise-options" class="choice-list">
+          <button class="choice-button" data-choice="hide">
+            <span class="choice-letter">A</span>
+            Keep quiet so the company does not lose users.
+          </button>
+          <button class="choice-button" data-choice="disclose">
+            <span class="choice-letter">B</span>
+            Clearly disclose the practice, stop unjustified sharing, and give users meaningful control.
+          </button>
+          <button class="choice-button" data-choice="bury">
+            <span class="choice-letter">C</span>
+            Add a long paragraph to the policy where few people will notice it.
+          </button>
+        </div>
+
+        <p id="promise-feedback" class="feedback" aria-live="polite"></p>
+        <button id="promise-continue" class="primary-button hidden">START FINAL REVIEW →</button>
+      </section>
+
+      <section id="case-review" class="case-panel hidden">
+        <p class="case-tag">FINAL REVIEW — FOUR QUESTIONS</p>
+        <h2>Prove you learned the case.</h2>
+        <p>Choose the best answer for each question. Your final score includes your investigation decisions.</p>
+
+        <div id="review-questions"></div>
+        <button id="review-submit" class="primary-button">SUBMIT FINAL REVIEW →</button>
+        <p id="review-feedback" class="feedback" aria-live="polite"></p>
+      </section>
+
+      <section id="results-screen" class="case-panel hidden">
+        <p class="case-tag">INVESTIGATION COMPLETE</p>
+        <h2 id="result-heading">Case closed.</h2>
+        <div class="final-score">
+          <span>YOUR PRIVACY SCORE</span>
+          <strong id="final-score">0</strong>
+          <span>POINTS</span>
+        </div>
+        <h3 id="result-rank"></h3>
+        <p id="result-message"></p>
+
+        <div class="takeaway-card">
+          <h3>Remember these principles</h3>
+          <ul>
+            <li>Collect only the information a feature genuinely needs.</li>
+            <li>Give users clear choices about permissions and data use.</li>
+            <li>Protect information with appropriate security controls.</li>
+            <li>Be honest about what an app collects and shares.</li>
+          </ul>
+        </div>
+
+        <button id="restart-button" class="primary-button">PLAY AGAIN ↻</button>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <p>PRIVACY PANIC · LEARN TO QUESTION THE DATA</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
