@@ -1,869 +1,986 @@
+"use strict";
 
-const $ = (id) => document.getElementById(id);
+const $ = (selector) => document.querySelector(selector);
 
 const screens = {
-  home: $("home-screen"),
-  game: $("game-screen")
+  intro: $("#intro-screen"),
+  game: $("#game-screen"),
+  review: $("#review-screen"),
+  results: $("#results-screen")
 };
 
-const cases = [
-  $("case-wordle"),
-  $("case-cords"),
-  $("case-access"),
-  $("case-promise"),
-  $("case-review"),
-  $("results-screen")
+const chapters = [
+  {
+    title: "The Password Breach",
+    objective: "Solve the five-letter password puzzle before the attacker gets in."
+  },
+  {
+    title: "The Access Request",
+    objective: "Choose the safest practical level of access for a contractor."
+  },
+  {
+    title: "The Privacy Incident",
+    objective: "Respond when the app shares information it should not have shared."
+  },
+  {
+    title: "Build the Data Pathway",
+    objective: "Connect app development to a working app without unnecessary data."
+  }
 ];
 
-let score = 0;
-let currentCase = 0;
-const maxScore = 100;
+const state = {
+  chapter: 0,
+  trust: 0,
+  evidence: [],
+  choices: {},
+  wordGuesses: [],
+  wordSolved: false,
+  cordSelection: [],
+  cordChecked: false,
+  quizIndex: 0,
+  quizScore: 0,
+  quizAnswers: [],
+  quizLocked: false
+};
 
-function addScore(points) {
-  score = Math.max(0, Math.min(maxScore, score + points));
-  $("score-display").textContent = score;
+function showScreen(name) {
+  Object.values(screens).forEach((screen) => screen.classList.remove("active"));
+  screens[name].classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function updateScore(points) {
+  state.trust = Math.max(0, Math.min(100, state.trust + points));
+  $("#trust-score").textContent = state.trust;
+}
+
+function setFeedback(message, good = true) {
+  const box = $("#mission-feedback");
+  box.innerHTML = message;
+  box.className = "mission-feedback show" + (good ? "" : " bad");
+}
+
+function clearFeedback() {
+  $("#mission-feedback").className = "mission-feedback";
+  $("#mission-feedback").innerHTML = "";
+}
+
+function addEvidence(text) {
+  if (!state.evidence.includes(text)) state.evidence.push(text);
+
+  const list = $("#evidence-list");
+  list.innerHTML = "";
+
+  state.evidence.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.appendChild(li);
+  });
 }
 
 function updateProgress() {
-  $("chapter-label").textContent =
-    currentCase < 4
-      ? `CASE 0${currentCase + 1} / 04`
-      : currentCase === 4
-        ? "FINAL REVIEW"
-        : "INVESTIGATION COMPLETE";
-
-  const titles = [
-    "Crack the Key",
-    "Connect the Cords",
-    "Control the Access",
-    "The Privacy Promise",
-    "Final Review",
-    "Case Closed"
-  ];
-
-  $("chapter-title").textContent = titles[currentCase] || "Case Closed";
-  $("progress-fill").style.width =
-    `${Math.min(100, (currentCase / 5) * 100)}%`;
-  $("score-display").textContent = score;
+  $("#chapter-count").textContent =
+    `MISSION ${String(state.chapter + 1).padStart(2, "0")} / 04`;
+  $("#chapter-heading").textContent = chapters[state.chapter].title;
+  $("#objective-text").textContent = chapters[state.chapter].objective;
+  $("#story-progress").style.width = `${(state.chapter / 4) * 100}%`;
+  $("#status-label").textContent = "MISSION IN PROGRESS";
+  $("#trust-score").textContent = state.trust;
 }
 
-function showCase(index) {
-  currentCase = index;
-  cases.forEach((element) => element.classList.add("hidden"));
-  cases[index].classList.remove("hidden");
+function startGame() {
+  state.chapter = 0;
+  state.trust = 0;
+  state.evidence = [];
+  state.choices = {};
+  state.wordGuesses = [];
+  state.wordSolved = false;
+  state.cordSelection = [];
+  state.cordChecked = false;
+  state.quizIndex = 0;
+  state.quizScore = 0;
+  state.quizAnswers = [];
+  state.quizLocked = false;
+
+  $("#evidence-list").innerHTML =
+    '<li class="empty-evidence">No evidence yet.</li>';
+
+  updateScore(0);
+  showScreen("game");
+  renderChapter();
+}
+
+function renderChapter() {
   updateProgress();
+  clearFeedback();
+  $("#mission-actions").innerHTML = "";
+
+  if (state.chapter === 0) renderPasswordPuzzle();
+  if (state.chapter === 1) renderAccessDecision();
+  if (state.chapter === 2) renderPrivacyIncident();
+  if (state.chapter === 3) renderCordPuzzle();
+}
+
+function addAction(label, callback, primary = false) {
+  const button = document.createElement("button");
+  button.className = primary ? "primary-button" : "secondary-button";
+  button.textContent = label;
+  button.addEventListener("click", callback);
+  $("#mission-actions").appendChild(button);
+  return button;
+}
+
+function nextChapter() {
+  state.chapter++;
+
+  if (state.chapter >= chapters.length) {
+    state.quizIndex = 0;
+    state.quizScore = 0;
+    state.quizAnswers = [];
+    state.quizLocked = false;
+    showScreen("review");
+    renderQuiz();
+    return;
+  }
+
+  renderChapter();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-$("start-button").addEventListener("click", () => {
-  screens.home.classList.remove("active");
-  screens.game.classList.add("active");
-  showCase(0);
-});
-
-function restartGame() {
-  score = 0;
-  currentCase = 0;
-  screens.game.classList.remove("active");
-  screens.home.classList.add("active");
-
-  resetWordle();
-  resetCords();
-  resetChoiceCase("access");
-  resetChoiceCase("promise");
-  $("review-feedback").textContent = "";
-  $("review-submit").disabled = false;
-  $("review-questions").querySelectorAll("input").forEach((input) => {
-    input.checked = false;
-  });
-
-  $("access-continue").classList.add("hidden");
-  $("promise-continue").classList.add("hidden");
-  $("key-explanation").classList.add("hidden");
-  $("cord-result").classList.add("hidden");
-
-  updateProgress();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
 }
 
-$("restart-button").addEventListener("click", restartGame);
+/* ==================================================
+   MISSION 1: PASSWORD PUZZLE
+================================================== */
 
-/* --------------------------------------------------
-   CASE 1: WORDLE-STYLE ENCRYPTION KEY
--------------------------------------------------- */
-
-const secretWord = "TRUST";
+const passwordAnswer = "TRUST";
 const maxGuesses = 6;
-const keyboardRows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
 
-let guesses = [];
-let currentGuess = "";
-let wordSolved = false;
-let wordFailed = false;
-let wordScoreAwarded = false;
-let keyboardStatus = {};
+function renderPasswordPuzzle() {
+  $("#mission-content").innerHTML = `
+    <div class="eyebrow">DIGITAL FORENSICS // 01</div>
+    <h2>The Password Breach</h2>
+    <p>An attacker is trying to access the fictional Connectly app.
+    Solve the five-letter password in six attempts.</p>
+    <div class="terminal">
+      <div class="terminal-top">CONNECTLY AUTHENTICATION TERMINAL // OFFLINE</div>
+      <p>ACCESS LOCKED. PASSWORD LENGTH: 5</p>
+      <p>GREEN = correct letter and position.</p>
+      <p>GOLD = correct letter, wrong position.</p>
+      <p>GRAY = letter not used in the password.</p>
+      <p><strong>KEY CLUE:</strong> A secret is safer when you don't tell everyone.</p>
+    </div>
+    <div class="story-email">
+      <div class="email-head">ENCRYPTION KEY // HOW TO THINK ABOUT IT</div>
+      <p>In this puzzle, the hidden password is like a secret key: you use the clue
+      and the computer's letter-by-letter feedback to reason toward the value.</p>
+      <p><strong>Real-world distinction:</strong> real encryption keys are generated
+      and used by cryptographic algorithms; people don't normally discover them by
+      playing Wordle. This puzzle is an analogy for protecting secrets and using
+      systematic feedback, not a demonstration of real encryption.</p>
+    </div>
+    <div id="wordle-grid" class="wordle-grid" aria-label="Password puzzle board"></div>
+    <form id="guess-form" class="guess-form">
+      <input id="guess-input" type="text" minlength="5" maxlength="5"
+        pattern="[A-Za-z]{5}" autocomplete="off"
+        aria-label="Enter a five-letter guess" placeholder="GUESS">
+      <button class="primary-button" type="submit">CHECK</button>
+    </form>
+    <p class="inline-note" id="guess-note">Attempt 1 of 6</p>
+  `;
 
-function buildWordleBoard() {
-  const board = $("wordle-board");
-  board.innerHTML = "";
+  const grid = $("#wordle-grid");
 
   for (let row = 0; row < maxGuesses; row++) {
-    const rowElement = document.createElement("div");
-    rowElement.className = "wordle-row";
+    const rowEl = document.createElement("div");
+    rowEl.className = "wordle-row";
+    rowEl.id = `word-row-${row}`;
 
     for (let col = 0; col < 5; col++) {
-      const tile = document.createElement("div");
-      tile.className = "wordle-tile";
-      tile.id = `tile-${row}-${col}`;
-      rowElement.appendChild(tile);
+      const cell = document.createElement("div");
+      cell.className = "letter-cell";
+      cell.id = `word-cell-${row}-${col}`;
+      rowEl.appendChild(cell);
     }
 
-    board.appendChild(rowElement);
+    grid.appendChild(rowEl);
   }
-}
 
-function buildKeyboard() {
-  const keyboard = $("wordle-keyboard");
-  keyboard.innerHTML = "";
-
-  keyboardRows.forEach((letters, rowIndex) => {
-    const row = document.createElement("div");
-    row.className = "keyboard-row";
-
-    if (rowIndex === 2) {
-      const enter = document.createElement("button");
-      enter.className = "key-button wide";
-      enter.textContent = "ENTER";
-      enter.addEventListener("click", submitGuess);
-      row.appendChild(enter);
-    }
-
-    for (const letter of letters) {
-      const key = document.createElement("button");
-      key.className = "key-button";
-      key.textContent = letter;
-      key.dataset.letter = letter;
-      key.addEventListener("click", () => addLetter(letter));
-      row.appendChild(key);
-    }
-
-    if (rowIndex === 2) {
-      const backspace = document.createElement("button");
-      backspace.className = "key-button wide";
-      backspace.textContent = "⌫";
-      backspace.setAttribute("aria-label", "Delete last letter");
-      backspace.addEventListener("click", deleteLetter);
-      row.appendChild(backspace);
-    }
-
-    keyboard.appendChild(row);
+  $("#guess-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    evaluateGuess();
   });
+
+  $("#guess-input").focus({ preventScroll: true });
 }
 
-function paintCurrentGuess() {
-  for (let col = 0; col < 5; col++) {
-    const tile = $(`tile-${guesses.length}-${col}`);
-    if (!tile) continue;
+function evaluateGuess() {
+  if (state.wordSolved || state.wordGuesses.length >= maxGuesses) return;
 
-    tile.textContent = currentGuess[col] || "";
-    tile.classList.toggle("filled", Boolean(currentGuess[col]));
+  const input = $("#guess-input");
+  const guess = input.value.trim().toUpperCase();
+
+  if (!/^[A-Z]{5}$/.test(guess)) {
+    $("#guess-note").textContent = "Enter exactly five letters.";
+    return;
   }
-}
 
-function addLetter(letter) {
-  if (wordSolved || wordFailed || guesses.length >= maxGuesses) return;
-  if (currentGuess.length >= 5) return;
+  const rowIndex = state.wordGuesses.length;
+  state.wordGuesses.push(guess);
 
-  currentGuess += letter;
-  paintCurrentGuess();
-  $("wordle-message").textContent = "Keep going. Use the clue and test your logic.";
-}
-
-function deleteLetter() {
-  if (wordSolved || wordFailed) return;
-
-  currentGuess = currentGuess.slice(0, -1);
-  paintCurrentGuess();
-}
-
-function evaluateGuess(guess, answer) {
+  const remaining = passwordAnswer.split("");
   const result = Array(5).fill("absent");
-  const remaining = answer.split("");
 
-  // First pass: mark exact-position matches.
   for (let i = 0; i < 5; i++) {
-    if (guess[i] === answer[i]) {
+    if (guess[i] === passwordAnswer[i]) {
       result[i] = "correct";
       remaining[i] = null;
     }
   }
 
-  // Second pass: mark correct letters in other positions.
   for (let i = 0; i < 5; i++) {
     if (result[i] === "correct") continue;
 
-    const matchIndex = remaining.indexOf(guess[i]);
-
-    if (matchIndex !== -1) {
+    const found = remaining.indexOf(guess[i]);
+    if (found !== -1) {
       result[i] = "present";
-      remaining[matchIndex] = null;
+      remaining[found] = null;
     }
   }
-
-  return result;
-}
-
-function updateKeyboard(letter, status) {
-  const priority = {
-    absent: 1,
-    present: 2,
-    correct: 3
-  };
-
-  const oldStatus = keyboardStatus[letter];
-
-  if (!oldStatus || priority[status] > priority[oldStatus]) {
-    keyboardStatus[letter] = status;
-  }
-
-  const key = document.querySelector(
-    `.key-button[data-letter="${letter}"]`
-  );
-
-  if (key) {
-    key.classList.remove("correct", "present", "absent");
-    key.classList.add(keyboardStatus[letter]);
-  }
-}
-
-function submitGuess() {
-  if (wordSolved || wordFailed) return;
-
-  if (currentGuess.length !== 5) {
-    $("wordle-message").textContent =
-      "You need exactly five letters before submitting.";
-    return;
-  }
-
-  const guess = currentGuess;
-  const result = evaluateGuess(guess, secretWord);
-  const rowIndex = guesses.length;
-
-  guesses.push(guess);
 
   for (let i = 0; i < 5; i++) {
-    const tile = $(`tile-${rowIndex}-${i}`);
-    tile.textContent = guess[i];
-    tile.classList.remove("filled");
-    tile.classList.add(result[i]);
-    updateKeyboard(guess[i], result[i]);
+    const cell = $(`#word-cell-${rowIndex}-${i}`);
+    cell.textContent = guess[i];
+    cell.classList.add(result[i]);
   }
 
-  currentGuess = "";
-
-  if (guess === secretWord) {
-    wordSolved = true;
-
-    if (!wordScoreAwarded) {
-      const points = Math.max(10, 20 - (guesses.length - 1) * 2);
-      addScore(points);
-      wordScoreAwarded = true;
-    }
-
-    $("wordle-message").textContent =
-      `Key discovered in ${guesses.length} of ${maxGuesses} guesses!`;
-
-    $("key-explanation").classList.remove("hidden");
-    $("wordle-submit").disabled = true;
-    $("wordle-message").style.color = "var(--green)";
+  if (guess === passwordAnswer) {
+    state.wordSolved = true;
+    updateScore(10);
+    addEvidence("Solved the password puzzle.");
+    setFeedback(
+      "<strong>ACCESS RESTORED — +10 POINTS.</strong> You solved the password. " +
+      "Real apps should also use secure password storage, rate limiting, and " +
+      "appropriate authentication protections."
+    );
+    $("#guess-form").remove();
+    addAction("NEXT: ACCESS CONTROL →", nextChapter, true);
     return;
   }
 
-  if (guesses.length >= maxGuesses) {
-    wordFailed = true;
-    $("wordle-message").textContent =
-      `The answer was ${secretWord}. Review the feedback and continue learning.`;
-    $("key-explanation").classList.remove("hidden");
-    $("wordle-submit").disabled = true;
+  if (state.wordGuesses.length >= maxGuesses) {
+    setFeedback(
+      `Attempts exhausted. The training password was <strong>${passwordAnswer}</strong>. ` +
+      "Continue to learn how access permissions and data handling protect an app.",
+      false
+    );
+    $("#guess-form").remove();
+    addAction("CONTINUE →", nextChapter, true);
     return;
   }
 
-  $("wordle-message").textContent =
-    "Not quite. Green = correct position; yellow = correct letter, wrong position; gray = not used in the answer.";
+  $("#guess-note").textContent =
+    `Attempt ${state.wordGuesses.length + 1} of ${maxGuesses}`;
+  input.value = "";
+  input.focus();
 }
 
-function resetWordle() {
-  guesses = [];
-  currentGuess = "";
-  wordSolved = false;
-  wordFailed = false;
-  wordScoreAwarded = false;
-  keyboardStatus = {};
+/* ==================================================
+   MISSION 2: ACCESS CONTROL
+================================================== */
 
-  buildWordleBoard();
-  buildKeyboard();
+function renderAccessDecision() {
+  $("#mission-content").innerHTML = `
+    <div class="eyebrow">PERMISSIONS REVIEW // 02</div>
+    <h2>The Access Request</h2>
+    <p>A contractor is helping fix a bug in Connectly. They ask for access
+    to the production system. Which option gives them enough access to do
+    the job without exposing everything?</p>
 
-  $("wordle-message").textContent =
-    "Enter a five-letter guess to begin.";
-  $("wordle-message").style.color = "";
-  $("wordle-submit").disabled = false;
-  $("key-explanation").classList.add("hidden");
+    <div class="story-email">
+      <div class="email-head">INCOMING REQUEST // CONTRACTOR</div>
+      “I need to investigate the login issue. Can you give me access today?”
+    </div>
+
+    <div class="choice-list">
+      <button class="choice-button" data-access="limited">
+        <strong>A — Limited, temporary access</strong>
+        <span>Grant only the permissions needed for the bug, set an expiry,
+        and review activity.</span>
+      </button>
+      <button class="choice-button" data-access="admin">
+        <strong>B — Full administrator access</strong>
+        <span>Give access to every account, database, and production setting.</span>
+      </button>
+      <button class="choice-button" data-access="dump">
+        <strong>C — Export the full user database</strong>
+        <span>Send a copy of all user information to the contractor's personal email.</span>
+      </button>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-access]").forEach((button) => {
+    button.addEventListener("click", () => chooseAccess(button.dataset.access, button));
+  });
 }
 
-$("wordle-submit").addEventListener("click", submitGuess);
-$("wordle-reset").addEventListener("click", resetWordle);
+function chooseAccess(choice, button) {
+  if (state.choices.access) return;
+  state.choices.access = choice;
 
-document.addEventListener("keydown", (event) => {
-  if (!$("case-wordle").classList.contains("hidden")) {
-    if (/^[a-zA-Z]$/.test(event.key)) {
-      addLetter(event.key.toUpperCase());
-    } else if (event.key === "Backspace") {
-      deleteLetter();
-    } else if (event.key === "Enter") {
-      submitGuess();
-    }
+  document.querySelectorAll("[data-access]").forEach((item) => {
+    item.disabled = true;
+    if (item === button) item.classList.add("chosen");
+  });
+
+  if (choice === "limited") {
+    updateScore(25);
+    addEvidence("Chose limited, temporary contractor access.");
+    button.classList.add("correct-choice");
+    setFeedback(
+      "<strong>GOOD SECURITY DECISION — +25 POINTS.</strong> This follows " +
+      "least privilege: give a person only the access needed for their task. " +
+      "Time limits, logging, and review further reduce risk."
+    );
+  } else if (choice === "admin") {
+    addEvidence("Granted overly broad contractor access.");
+    button.classList.add("wrong-choice");
+    setFeedback(
+      "<strong>TOO MUCH ACCESS — +0 POINTS.</strong> Unrestricted access can " +
+      "expose systems and user information unnecessarily. Narrow the permissions " +
+      "and set an expiry.",
+      false
+    );
+  } else {
+    updateScore(5);
+    addEvidence("Considered an unsafe full-database export.");
+    button.classList.add("wrong-choice");
+    setFeedback(
+      "<strong>HIGH-RISK SHORTCUT — +5 POINTS.</strong> Sending a full database " +
+      "to a personal email exposes information beyond the task. Use an approved " +
+      "environment and limit the data used for debugging.",
+      false
+    );
   }
-});
 
-$("wordle-continue").addEventListener("click", () => {
-  showCase(1);
-});
+  addAction("NEXT: PRIVACY INCIDENT →", nextChapter, true);
+}
 
-/* --------------------------------------------------
-   CASE 2: CONNECT THE CORDS
--------------------------------------------------- */
+/* ==================================================
+   MISSION 3: PRIVACY INCIDENT
+================================================== */
 
-const requiredConnections = [
-  { source: "email", target: "recovery" },
-  { source: "display", target: "profile" }
+function renderPrivacyIncident() {
+  $("#mission-content").innerHTML = `
+    <div class="eyebrow">INCIDENT RESPONSE // 03</div>
+    <h2>The Privacy Incident</h2>
+    <p>A developer discovers that Connectly sends precise location history
+    to an analytics partner, even though location tracking is not needed
+    for the app's advertised features.</p>
+
+    <div class="story-email">
+      <div class="email-head">INTERNAL ALERT // DATA FLOW MISMATCH</div>
+      <p><strong>Issue:</strong> Location history is being transmitted without
+      a clear need for the app's stated purpose.</p>
+      <p><strong>Risk:</strong> Users may not understand what is collected or
+      who receives it.</p>
+    </div>
+
+    <p><strong>What should you do first?</strong></p>
+
+    <div class="choice-list">
+      <button class="choice-button" data-incident="stop">
+        <strong>A — Stop the unnecessary sharing and investigate</strong>
+        <span>Contain the data flow, preserve relevant records, and assess the
+        appropriate next steps.</span>
+      </button>
+      <button class="choice-button" data-incident="hide">
+        <strong>B — Hide it from users</strong>
+        <span>Leave the feature running and remove references to it from documentation.</span>
+      </button>
+      <button class="choice-button" data-incident="delete">
+        <strong>C — Delete the logs immediately</strong>
+        <span>Erase the records so no one can discover what happened.</span>
+      </button>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-incident]").forEach((button) => {
+    button.addEventListener("click", () => chooseIncident(button.dataset.incident, button));
+  });
+}
+
+function chooseIncident(choice, button) {
+  if (state.choices.incident) return;
+  state.choices.incident = choice;
+
+  document.querySelectorAll("[data-incident]").forEach((item) => {
+    item.disabled = true;
+    if (item === button) item.classList.add("chosen");
+  });
+
+  if (choice === "stop") {
+    updateScore(25);
+    addEvidence("Selected a responsible privacy incident response.");
+    button.classList.add("correct-choice");
+    setFeedback(
+      "<strong>RESPONSIBLE RESPONSE — +25 POINTS.</strong> Contain the unnecessary " +
+      "sharing, investigate the scope, preserve appropriate evidence, and involve " +
+      "the responsible privacy and security team. Assess whether notice or other " +
+      "action is required under applicable law; reporting obligations depend on the facts."
+    );
+  } else if (choice === "hide") {
+    addEvidence("Chose concealment instead of incident response.");
+    button.classList.add("wrong-choice");
+    setFeedback(
+      "<strong>CONCEALMENT MAKES THINGS WORSE — +0 POINTS.</strong> Hiding the " +
+      "practice leaves the risk in place and may mislead users. The FTC Act can " +
+      "address deceptive practices in or affecting commerce, depending on the facts.",
+      false
+    );
+  } else {
+    addEvidence("Chose to erase incident records.");
+    button.classList.add("wrong-choice");
+    setFeedback(
+      "<strong>DO NOT DESTROY THE EVIDENCE — +0 POINTS.</strong> Follow incident " +
+      "response procedures to preserve appropriate records. You need reliable " +
+      "evidence to understand what happened and determine the right corrective action.",
+      false
+    );
+  }
+
+  addAction("NEXT: BUILD THE DATA PATHWAY →", nextChapter, true);
+}
+
+/* ==================================================
+   MISSION 4: CORD-ROUTING PUZZLE
+================================================== */
+
+const nodes = {
+  start:   { x: 58,  y: 205, label: "APP",        sub: "DEVELOPMENT" },
+  account: { x: 225, y: 92,  label: "ACCOUNT",    sub: "SETUP" },
+  extra1:  { x: 225, y: 318, label: "CONTACTS",   sub: "IMPORT" },
+  profile: { x: 430, y: 92,  label: "PROFILE",    sub: "DISPLAY" },
+  extra2:  { x: 430, y: 205, label: "LOCATION",   sub: "TRACKING" },
+  extra3:  { x: 430, y: 318, label: "MICROPHONE", sub: "ACCESS" },
+  recovery:{ x: 640, y: 92,  label: "PASSWORD",   sub: "RECOVERY" },
+  extra4:  { x: 640, y: 318, label: "AD TRACKING",sub: "PROFILE" },
+  finish:  { x: 842, y: 205, label: "WORKING",    sub: "APP" }
+};
+
+const cords = [
+  { id: "email", from: "start", to: "account",
+    label: "Email → account", needed: true, lx: 138, ly: 130 },
+  { id: "contacts", from: "start", to: "extra1",
+    label: "Contacts → signup", needed: false, lx: 140, ly: 286 },
+  { id: "display", from: "account", to: "profile",
+    label: "Display name → profile", needed: true, lx: 330, ly: 69 },
+  { id: "location", from: "account", to: "extra2",
+    label: "Location history", needed: false, lx: 328, ly: 143 },
+  { id: "contact-sync", from: "extra1", to: "extra2",
+    label: "Contact sync", needed: false, lx: 327, ly: 287 },
+  { id: "microphone", from: "extra2", to: "extra3",
+    label: "Microphone access", needed: false, lx: 430, ly: 263 },
+  { id: "reset", from: "profile", to: "recovery",
+    label: "Reset token → recovery", needed: true, lx: 535, ly: 69 },
+  { id: "ad-id", from: "extra3", to: "extra4",
+    label: "Advertising ID", needed: false, lx: 535, ly: 287 },
+  { id: "secure-session", from: "recovery", to: "finish",
+    label: "Secure login session", needed: true, lx: 745, ly: 130 },
+  { id: "analytics", from: "extra4", to: "finish",
+    label: "Full analytics bundle", needed: false, lx: 745, ly: 286 }
 ];
 
-const sourceNames = {
-  email: "Email address",
-  display: "Display name",
-  contacts: "Phone contacts",
-  location: "Location history",
-  microphone: "Microphone access"
-};
+function renderCordPuzzle() {
+  state.cordSelection = [];
+  state.cordChecked = false;
 
-const targetNames = {
-  recovery: "Account recovery",
-  profile: "Public profile",
-  friends: "Friend suggestions",
-  nearby: "Nearby recommendations",
-  voice: "Voice messages"
-};
+  $("#mission-content").innerHTML = `
+    <div class="eyebrow">SYSTEM DESIGN // 04</div>
+    <h2>Build the Data Pathway</h2>
+    <p>Your app needs account creation, a display name, and password recovery.
+    Connect the start to the working app with the fewest necessary data connections.</p>
 
-let selectedSource = null;
-let connections = [];
-let cordsScored = false;
+    <div class="cord-instructions">
+      <strong>YOUR OBJECTIVE:</strong> Click cords to select or deselect them.
+      Build a continuous route from <em>App Development</em> to <em>Working App</em>.
+      Extra cords mean unnecessary data collection. Too few cords may leave the app broken.
+    </div>
 
-function connectionKey(source, target) {
-  return `${source}->${target}`;
+    <div class="cord-legend">
+      <span class="legend-item"><span class="legend-line"></span> Available cord</span>
+      <span class="legend-item"><span class="legend-line extra"></span> Selected cord</span>
+    </div>
+
+    <div class="cord-board-wrap">
+      <svg id="cord-board" class="cord-board" viewBox="0 0 900 410"
+        role="group" aria-label="Interactive data pathway puzzle"></svg>
+      <div class="cord-board-caption">
+        <span>START: APP DEVELOPMENT</span>
+        <span id="cord-count">0 CORDS CONNECTED</span>
+        <span>FINISH: WORKING APP</span>
+      </div>
+    </div>
+
+    <div id="cord-key" class="cord-key"></div>
+    <p id="cord-status" class="cord-status" aria-live="polite">
+      Select a cord to build your route.
+    </p>
+  `;
+
+  drawCordBoard();
+  updateCordSelectionDisplay();
+  addAction("CLEAR ALL CORDS", clearCords);
+  addAction("TEST MY PATHWAY →", checkCordPath, true);
 }
 
-function isRequired(source, target) {
-  return requiredConnections.some(
-    (item) => item.source === source && item.target === target
-  );
-}
-
-function getNode(selector, value) {
-  return document.querySelector(
-    `.${selector}[data-${selector === "source-node" ? "source" : "target"}="${value}"]`
-  );
-}
-
-function resetCordStyles() {
-  document.querySelectorAll(".cord-node").forEach((node) => {
-    node.classList.remove("selected", "connected", "has-extra");
-  });
-}
-
-function updateCordNodeStyles() {
-  resetCordStyles();
-
-  if (selectedSource) {
-    const sourceNode = document.querySelector(
-      `.source-node[data-source="${selectedSource}"]`
-    );
-    if (sourceNode) sourceNode.classList.add("selected");
-  }
-
-  connections.forEach((connection) => {
-    const sourceNode = document.querySelector(
-      `.source-node[data-source="${connection.source}"]`
-    );
-    const targetNode = document.querySelector(
-      `.target-node[data-target="${connection.target}"]`
-    );
-
-    if (sourceNode) sourceNode.classList.add("connected");
-    if (targetNode) targetNode.classList.add("connected");
-
-    if (!isRequired(connection.source, connection.target)) {
-      if (sourceNode) sourceNode.classList.add("has-extra");
-      if (targetNode) targetNode.classList.add("has-extra");
-    }
-  });
-}
-
-function drawCords() {
-  const workspace = $("cord-workspace");
-  const svg = $("cord-svg");
-  const bounds = workspace.getBoundingClientRect();
-
-  svg.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
+function drawCordBoard() {
+  const svg = $("#cord-board");
   svg.innerHTML = "";
 
-  connections.forEach((connection) => {
-    const sourceNode = document.querySelector(
-      `.source-node[data-source="${connection.source}"]`
-    );
-    const targetNode = document.querySelector(
-      `.target-node[data-target="${connection.target}"]`
-    );
+  cords.forEach((cord) => {
+    const from = nodes[cord.from];
+    const to = nodes[cord.to];
+    const bendX = (from.x + to.x) / 2;
 
-    if (!sourceNode || !targetNode) return;
-
-    const sourceRect = sourceNode.getBoundingClientRect();
-    const targetRect = targetNode.getBoundingClientRect();
-
-    const x1 = sourceRect.right - bounds.left;
-    const y1 = sourceRect.top + sourceRect.height / 2 - bounds.top;
-    const x2 = targetRect.left - bounds.left;
-    const y2 = targetRect.top + targetRect.height / 2 - bounds.top;
-
-    const curve = Math.max(25, (x2 - x1) * 0.45);
-
-    const path = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "path"
-    );
-
-    path.setAttribute(
-      "d",
-      `M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`
-    );
-
-    path.setAttribute(
-      "class",
-      `cord-line ${isRequired(connection.source, connection.target) ? "necessary" : "extra"}`
-    );
-
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d",
+      `M ${from.x} ${from.y} L ${bendX} ${from.y} L ${to.x} ${to.y}`);
+    path.setAttribute("class", "cord-line");
+    path.setAttribute("tabindex", "0");
+    path.setAttribute("role", "button");
+    path.setAttribute("aria-label", `${cord.label}. Select cord.`);
+    path.dataset.cord = cord.id;
+    path.addEventListener("click", () => toggleCord(cord.id));
+    path.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleCord(cord.id);
+      }
+    });
     svg.appendChild(path);
+
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", cord.lx);
+    label.setAttribute("y", cord.ly);
+    label.setAttribute("class", "cord-label");
+    label.textContent = cord.label;
+    svg.appendChild(label);
   });
 
-  updateCordNodeStyles();
+  Object.entries(nodes).forEach(([id, node]) => {
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+
+    circle.setAttribute("cx", node.x);
+    circle.setAttribute("cy", node.y);
+    circle.setAttribute("r", id === "start" || id === "finish" ? 32 : 27);
+    circle.setAttribute("class",
+      "cord-node" + (id === "start" || id === "finish" ? ` ${id}` : ""));
+    group.appendChild(circle);
+
+    const main = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    main.setAttribute("x", node.x);
+    main.setAttribute("y", node.y - 3);
+    main.setAttribute("class", "cord-node-text");
+    main.textContent = node.label;
+    group.appendChild(main);
+
+    const sub = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    sub.setAttribute("x", node.x);
+    sub.setAttribute("y", node.y + 10);
+    sub.setAttribute("class", "cord-node-text");
+    sub.setAttribute("font-size", "8");
+    sub.textContent = node.sub;
+    group.appendChild(sub);
+
+    svg.appendChild(group);
+  });
 }
 
-function selectSource(source) {
-  selectedSource = source;
+function toggleCord(id) {
+  if (state.cordChecked) return;
 
-  $("cord-selection").textContent =
-    `Selected: ${sourceNames[source]}. Now choose the feature that needs it.`;
+  const index = state.cordSelection.indexOf(id);
+  if (index >= 0) state.cordSelection.splice(index, 1);
+  else state.cordSelection.push(id);
 
-  updateCordNodeStyles();
+  updateCordSelectionDisplay();
 }
 
-function selectTarget(target) {
-  if (!selectedSource) {
-    $("cord-selection").textContent =
-      "Choose an information source on the left first.";
-    return;
+function updateCordSelectionDisplay() {
+  const key = $("#cord-key");
+  if (!key) return;
+
+  key.innerHTML = "";
+
+  cords.forEach((cord) => {
+    const selected = state.cordSelection.includes(cord.id);
+    const tag = document.createElement("span");
+    tag.className = "cord-tag" + (selected ? " selected" : "");
+    tag.textContent = (selected ? "✓ " : "") + cord.label;
+    key.appendChild(tag);
+  });
+
+  $("#cord-count").textContent =
+    `${state.cordSelection.length} CORD${state.cordSelection.length === 1 ? "" : "S"} CONNECTED`;
+
+  $("#cord-board").querySelectorAll(".cord-line").forEach((line) => {
+    const selected = state.cordSelection.includes(line.dataset.cord);
+    const cord = cords.find((item) => item.id === line.dataset.cord);
+    line.classList.toggle("selected", selected);
+    line.classList.toggle("needed", Boolean(cord?.needed));
+    line.setAttribute("aria-pressed", String(selected));
+  });
+
+  $("#cord-status").textContent = state.cordChecked
+    ? "Pathway tested. Review the feedback below."
+    : state.cordSelection.length
+      ? `${state.cordSelection.length} cord(s) selected. Keep connecting to the working app.`
+      : "Select a cord to build your route.";
+}
+
+function clearCords() {
+  if (state.cordChecked) return;
+  state.cordSelection = [];
+  updateCordSelectionDisplay();
+  clearFeedback();
+}
+
+function hasCompletePath(selectedIds) {
+  const selectedCords = cords.filter((cord) => selectedIds.includes(cord.id));
+  const visited = new Set();
+
+  function visit(nodeId) {
+    if (nodeId === "finish") return true;
+    if (visited.has(nodeId)) return false;
+    visited.add(nodeId);
+
+    const adjacent = selectedCords
+      .filter((cord) => cord.from === nodeId || cord.to === nodeId)
+      .map((cord) => cord.from === nodeId ? cord.to : cord.from);
+
+    return adjacent.some(visit);
   }
 
-  const source = selectedSource;
-  const key = connectionKey(source, target);
-  const exists = connections.some(
-    (connection) => connectionKey(connection.source, connection.target) === key
+  return visit("start");
+}
+
+function checkCordPath() {
+  if (state.cordChecked) return;
+
+  const selected = state.cordSelection;
+  const selectedCords = cords.filter((cord) => selected.includes(cord.id));
+  const hasPath = hasCompletePath(selected);
+  const unnecessary = selectedCords.filter((cord) => !cord.needed);
+  const missing = cords.filter(
+    (cord) => cord.needed && !selected.includes(cord.id)
   );
 
-  if (exists) {
-    $("cord-selection").textContent =
-      "That connection already exists. Click the connection's feature again to remove it.";
-    selectedSource = null;
-    updateCordNodeStyles();
-    return;
-  }
+  state.cordChecked = true;
+  $("#mission-actions").innerHTML = "";
 
-  connections.push({ source, target });
-  selectedSource = null;
-
-  const required = isRequired(source, target);
-
-  $("cord-selection").textContent = required
-    ? `Connected ${sourceNames[source]} to ${targetNames[target]}. This is a necessary pathway.`
-    : `Connected ${sourceNames[source]} to ${targetNames[target]}. Check whether the feature truly needs this information.`;
-
-  drawCords();
-}
-
-document.querySelectorAll(".source-node").forEach((node) => {
-  node.addEventListener("click", () => {
-    selectSource(node.dataset.source);
+  $("#cord-board").querySelectorAll(".cord-line").forEach((line) => {
+    line.style.cursor = "default";
   });
-});
 
-document.querySelectorAll(".target-node").forEach((node) => {
-  node.addEventListener("click", () => {
-    const target = node.dataset.target;
-
-    // Clicking a target with an existing connection removes that connection.
-    const existingIndex = connections.findIndex(
-      (connection) => connection.target === target
+  if (hasPath && unnecessary.length === 0 && missing.length === 0) {
+    updateScore(40);
+    addEvidence("Built the minimum working data pathway.");
+    setFeedback(
+      "<strong>PERFECT ROUTE — +40 POINTS.</strong> You connected the app from " +
+      "start to finish using only the necessary cords. Email supports account setup, " +
+      "a display name supports the profile, a reset token supports recovery, and a " +
+      "secure session supports sign-in. This demonstrates data minimization."
     );
-
-    if (existingIndex !== -1 && !selectedSource) {
-      const removed = connections.splice(existingIndex, 1)[0];
-
-      $("cord-selection").textContent =
-        `Removed ${sourceNames[removed.source]} → ${targetNames[removed.target]}.`;
-
-      drawCords();
-      return;
-    }
-
-    selectTarget(target);
-  });
-});
-
-function resetCords() {
-  selectedSource = null;
-  connections = [];
-  cordsScored = false;
-
-  $("cord-selection").textContent =
-    "Choose an information source to start a connection.";
-  $("cord-result").classList.add("hidden");
-  $("cord-submit").disabled = false;
-  $("cord-svg").innerHTML = "";
-
-  resetCordStyles();
-  drawCords();
-}
-
-$("cord-reset").addEventListener("click", resetCords);
-
-$("cord-submit").addEventListener("click", () => {
-  if (cordsScored) return;
-
-  const requiredFound = requiredConnections.filter((required) =>
-    connections.some(
-      (connection) =>
-        connection.source === required.source &&
-        connection.target === required.target
-    )
-  ).length;
-
-  const unnecessary = connections.filter(
-    (connection) => !isRequired(connection.source, connection.target)
-  ).length;
-
-  const missing = requiredConnections.length - requiredFound;
-  const points = Math.max(0, 30 - missing * 10 - unnecessary * 7);
-
-  addScore(points);
-  cordsScored = true;
-
-  $("cord-result-title").textContent =
-    unnecessary === 0 && missing === 0
-      ? "Excellent data design!"
-      : "Your design needs work.";
-
-  $("cord-result-text").textContent =
-    `You found ${requiredFound} of ${requiredConnections.length} necessary pathways and created ${unnecessary} unnecessary connection(s). ` +
-    (missing > 0
-      ? "A feature may not work properly when it lacks information it genuinely needs. "
-      : "") +
-    (unnecessary > 0
-      ? "Extra pathways expose more information than the app needs. "
-      : "") +
-    "The safest design uses the minimum data necessary for each feature.";
-
-  $("cord-result-score").textContent =
-    `You earned ${points} out of 30 points for this case.`;
-
-  $("cord-result").classList.remove("hidden");
-  $("cord-submit").disabled = true;
-  $("cord-result").scrollIntoView({ behavior: "smooth", block: "nearest" });
-});
-
-$("cord-continue").addEventListener("click", () => {
-  showCase(2);
-});
-
-window.addEventListener("resize", () => {
-  if (!$("case-cords").classList.contains("hidden")) {
-    drawCords();
-  }
-});
-
-/* --------------------------------------------------
-   CASES 3 AND 4: PERMISSION AND ETHICS DECISIONS
--------------------------------------------------- */
-
-const choiceCases = {
-  access: {
-    options: $("access-options"),
-    feedback: $("access-feedback"),
-    continueButton: $("access-continue"),
-    correct: "limited",
-    points: 15,
-    success:
-      "Correct. A homework planner has no obvious need for continuous location tracking. Denying unnecessary access—or using a limited permission only when a real feature requires it—follows the principle of data minimization.",
-    other:
-      "Think about whether the app's stated purpose requires this permission. A permission request alone does not prove that the app needs the information."
-  },
-  promise: {
-    options: $("promise-options"),
-    feedback: $("promise-feedback"),
-    continueButton: $("promise-continue"),
-    correct: "disclose",
-    points: 15,
-    success:
-      "Correct. Privacy promises should match actual behavior. The responsible response is to be transparent, stop unjustified sharing, and give users meaningful choices.",
-    other:
-      "A hidden policy update does not solve the underlying trust problem. Users need clear, honest information about how their data is used."
-  }
-};
-
-const answeredCases = {
-  access: false,
-  promise: false
-};
-
-function resetChoiceCase(name) {
-  answeredCases[name] = false;
-  const config = choiceCases[name];
-
-  config.feedback.textContent = "";
-  config.continueButton.classList.add("hidden");
-
-  config.options.querySelectorAll(".choice-button").forEach((button) => {
-    button.disabled = false;
-    button.classList.remove(
-      "selected",
-      "correct-choice",
-      "incorrect-choice"
+  } else if (hasPath && unnecessary.length === 0) {
+    updateScore(25);
+    addEvidence("Built a working pathway without extra data connections.");
+    setFeedback(
+      "<strong>THE APP CONNECTS — +25 POINTS.</strong> Your route reaches the app " +
+      "without unnecessary data connections, but an intended connection is missing. " +
+      `Review these needed cords: <strong>${escapeHTML(missing.map(c => c.label).join("; "))}</strong>.`
     );
+  } else if (hasPath) {
+    updateScore(15);
+    addEvidence("Built a working route but included extra data connections.");
+    setFeedback(
+      "<strong>THE APP WORKS, BUT COLLECTS TOO MUCH — +15 POINTS.</strong> " +
+      `Unnecessary cords: <strong>${escapeHTML(unnecessary.map(c => c.label).join("; "))}</strong>. ` +
+      "Extra data can increase privacy and security risks. Remove connections that " +
+      "do not serve the stated purpose.",
+      false
+    );
+  } else {
+    addEvidence("The first data pathway did not reach the working app.");
+    setFeedback(
+      "<strong>THE PATHWAY IS BROKEN — +0 POINTS.</strong> Your selected cords do " +
+      "not create a continuous route from start to finish. The goal is not to remove " +
+      "all data; it is to use the minimum information needed for the app's features.",
+      false
+    );
+  }
+
+  const key = $("#cord-key");
+  key.innerHTML = "";
+
+  cords.forEach((cord) => {
+    const tag = document.createElement("span");
+    const selectedNow = selected.includes(cord.id);
+    tag.className = "cord-tag" +
+      (cord.needed ? " needed" : "") +
+      (selectedNow ? " selected" : "");
+    tag.textContent =
+      (cord.needed ? "NEEDED: " : "EXTRA: ") + cord.label;
+    key.appendChild(tag);
   });
+
+  addAction("CONTINUE TO FINAL QUIZ →", nextChapter, true);
 }
 
-function setupChoiceCase(name) {
-  const config = choiceCases[name];
+/* ==================================================
+   FINAL REVIEW QUIZ
+   Selecting an answer immediately checks it.
+================================================== */
 
-  config.options.querySelectorAll(".choice-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (answeredCases[name]) return;
-
-      const chosen = button.dataset.choice;
-      const correct = chosen === config.correct;
-
-      answeredCases[name] = true;
-
-      config.options.querySelectorAll(".choice-button").forEach((option) => {
-        option.disabled = true;
-
-        if (option.dataset.choice === config.correct) {
-          option.classList.add("correct-choice");
-        }
-      });
-
-      button.classList.add("selected");
-
-      if (!correct) {
-        button.classList.add("incorrect-choice");
-      }
-
-      if (correct) {
-        addScore(config.points);
-        config.feedback.textContent = config.success;
-        config.feedback.style.color = "var(--green)";
-      } else {
-        config.feedback.textContent = config.other;
-        config.feedback.style.color = "var(--yellow)";
-      }
-
-      config.continueButton.classList.remove("hidden");
-    });
-  });
-}
-
-setupChoiceCase("access");
-setupChoiceCase("promise");
-
-$("access-continue").addEventListener("click", () => {
-  showCase(3);
-});
-
-$("promise-continue").addEventListener("click", () => {
-  showCase(4);
-});
-
-/* --------------------------------------------------
-   FINAL REVIEW
--------------------------------------------------- */
-
-const reviewQuestions = [
+const quizQuestions = [
   {
-    question: "1. What does data minimization mean?",
-    answers: [
-      "Collect every available detail in case it becomes useful.",
-      "Collect only the information needed for a clear purpose.",
-      "Keep collecting information but delete it once a year."
+    question: "What does data minimization mean when designing an app?",
+    options: [
+      "Collect every type of data in case it becomes useful.",
+      "Collect and use only the information needed for a clear purpose.",
+      "Never collect any information, even when a feature needs it.",
+      "Keep all collected data forever."
     ],
-    correct: 1,
-    explanation:
-      "Data minimization means limiting collection to what is necessary for the stated purpose."
+    answer: 1,
+    explanation: "Data minimization means limiting collection and use to what is needed for the stated purpose."
   },
   {
-    question: "2. What does green feedback mean in the key puzzle?",
-    answers: [
-      "The letter is correct and in the correct position.",
-      "The letter is in the answer but in the wrong position.",
-      "The letter is not in the answer."
+    question: "What is the principle of least privilege?",
+    options: [
+      "Everyone on the team should be an administrator.",
+      "Users should share one account to simplify access.",
+      "Give each person only the access needed for their task.",
+      "Give contractors permanent access to avoid delays."
     ],
-    correct: 0,
-    explanation:
-      "Green marks an exact letter-and-position match. Yellow marks a letter in a different position."
+    answer: 2,
+    explanation: "Least privilege limits access to the minimum needed for assigned work."
   },
   {
-    question: "3. What should you do when an app requests an unrelated permission?",
-    answers: [
-      "Always allow it because the app asked.",
-      "Review the purpose and deny or limit unnecessary access.",
-      "Share the permission with other apps too."
+    question: "Which is the most responsible first response to unnecessary data sharing?",
+    options: [
+      "Hide the feature from the public.",
+      "Stop or contain the unnecessary flow and investigate.",
+      "Delete every record immediately.",
+      "Ignore it if the app still works."
     ],
-    correct: 1,
-    explanation:
-      "Permissions should match actual needs. If a feature genuinely needs access, choose the narrowest reasonable permission."
+    answer: 1,
+    explanation: "Contain the problem, preserve appropriate evidence, investigate, and assess what steps are required."
   },
   {
-    question: "4. What is the best response when an app breaks its privacy promise?",
-    answers: [
-      "Hide the practice in a longer privacy policy.",
-      "Ignore it unless users notice.",
-      "Be transparent, address unjustified sharing, and give users meaningful control."
+    question: "What does Section 5 of the FTC Act address?",
+    options: [
+      "Every app must collect no personal information whatsoever.",
+      "It guarantees every data incident leads to a fine.",
+      "It prohibits unfair or deceptive acts or practices in or affecting commerce.",
+      "It applies only to government websites."
     ],
-    correct: 2,
-    explanation:
-      "Privacy depends on honest communication and practices that match what users have been told."
+    answer: 2,
+    explanation: "Section 5 addresses unfair or deceptive acts or practices in or affecting commerce. Whether it applies depends on the facts and law."
   }
 ];
 
-function buildReview() {
-  const container = $("review-questions");
-  container.innerHTML = "";
+function renderQuiz() {
+  state.quizLocked = false;
+  const question = quizQuestions[state.quizIndex];
 
-  reviewQuestions.forEach((question, questionIndex) => {
-    const block = document.createElement("div");
-    block.className = "review-question";
+  $("#quiz-counter").textContent =
+    `QUESTION ${state.quizIndex + 1} / ${quizQuestions.length}`;
+  $("#quiz-progress").style.width =
+    `${(state.quizIndex / quizQuestions.length) * 100}%`;
 
-    const heading = document.createElement("h3");
-    heading.textContent = question.question;
-    block.appendChild(heading);
+  $("#quiz-content").innerHTML = `
+    <h2 class="quiz-question">${escapeHTML(question.question)}</h2>
+    <div id="quiz-options">
+      ${question.options.map((option, index) => `
+        <label class="quiz-option" data-option="${index}">
+          <input type="radio" name="quiz-answer" value="${index}">
+          <span>${escapeHTML(option)}</span>
+        </label>
+      `).join("")}
+    </div>
+    <p class="small-note">Select an answer to check it immediately.</p>
+  `;
 
-    question.answers.forEach((answer, answerIndex) => {
-      const label = document.createElement("label");
-      label.className = "review-option";
+  $("#quiz-feedback").className = "mission-feedback";
+  $("#quiz-feedback").innerHTML = "";
+  $("#quiz-actions").innerHTML = "";
 
-      const input = document.createElement("input");
-      input.type = "radio";
-      input.name = `review-${questionIndex}`;
-      input.value = answerIndex;
-
-      const text = document.createElement("span");
-      text.textContent = answer;
-
-      label.appendChild(input);
-      label.appendChild(text);
-      block.appendChild(label);
-    });
-
-    container.appendChild(block);
+  // Listen for the answer selection itself.
+  document.querySelectorAll('input[name="quiz-answer"]').forEach((input) => {
+    input.addEventListener("change", () => checkQuizAnswer(Number(input.value)));
   });
 }
 
-$("review-submit").addEventListener("click", () => {
-  const answers = [];
+function checkQuizAnswer(selectedIndex) {
+  if (state.quizLocked) return;
+  state.quizLocked = true;
 
-  for (let i = 0; i < reviewQuestions.length; i++) {
-    const selected = document.querySelector(
-      `input[name="review-${i}"]:checked`
-    );
+  const question = quizQuestions[state.quizIndex];
+  const correct = selectedIndex === question.answer;
 
-    if (!selected) {
-      $("review-feedback").textContent =
-        "Answer all four questions before submitting your final review.";
-      $("review-feedback").style.color = "var(--yellow)";
-      return;
+  state.quizAnswers.push({ selected: selectedIndex, correct });
+  if (correct) state.quizScore++;
+
+  document.querySelectorAll(".quiz-option").forEach((option) => {
+    const input = option.querySelector("input");
+    const optionIndex = Number(option.dataset.option);
+
+    input.disabled = true;
+    option.classList.add("locked");
+
+    if (optionIndex === question.answer) {
+      option.classList.add("correct-answer");
+      const mark = document.createElement("span");
+      mark.className = "answer-mark";
+      mark.textContent = "✓ CORRECT";
+      option.appendChild(mark);
+    } else if (optionIndex === selectedIndex) {
+      option.classList.add("wrong-answer");
+      const mark = document.createElement("span");
+      mark.className = "answer-mark";
+      mark.textContent = "✕ INCORRECT";
+      option.appendChild(mark);
     }
-
-    answers.push(Number(selected.value));
-  }
-
-  let correctCount = 0;
-  const explanations = [];
-
-  reviewQuestions.forEach((question, index) => {
-    if (answers[index] === question.correct) {
-      correctCount++;
-    }
-
-    explanations.push(
-      `${index + 1}. ${question.explanation}`
-    );
   });
 
-  const reviewPoints = correctCount * 5;
-  addScore(reviewPoints);
+  const feedback = $("#quiz-feedback");
+  feedback.innerHTML =
+    `<strong>${correct ? "CORRECT!" : "NOT QUITE."}</strong> ` +
+    escapeHTML(question.explanation);
+  feedback.className = "mission-feedback show" + (correct ? "" : " bad");
 
-  $("review-feedback").textContent =
-    `You answered ${correctCount} out of ${reviewQuestions.length} correctly. ` +
-    `You earned ${reviewPoints} out of 20 review points. ` +
-    explanations.join(" ");
+  $("#quiz-actions").innerHTML = "";
 
-  $("review-feedback").style.color = "var(--text)";
-  $("review-submit").disabled = true;
+  // FIX: Add the navigation button to the quiz's visible action area.
+  // addAction() targets #mission-actions, which is not shown on the review screen.
+  const nextButton = document.createElement("button");
+  nextButton.className = "primary-button";
+  nextButton.textContent =
+    state.quizIndex === quizQuestions.length - 1
+      ? "VIEW CASE REPORT →"
+      : "NEXT QUESTION →";
 
-  showResults();
-});
+  nextButton.addEventListener("click", () => {
+    state.quizIndex++;
+
+    if (state.quizIndex >= quizQuestions.length) {
+      showResults();
+    } else {
+      renderQuiz();
+    }
+  });
+
+  $("#quiz-actions").appendChild(nextButton);
+}
+
+/* ==================================================
+   RESULTS AND REPLAY
+================================================== */
 
 function showResults() {
-  showCase(5);
-
-  $("final-score").textContent = score;
-  $("progress-fill").style.width = "100%";
+  showScreen("results");
+  $("#final-score").textContent = state.trust;
+  $("#story-progress").style.width = "100%";
 
   let rank;
-  let message;
+  let summary;
 
-  if (score >= 85) {
-    rank = "PRIVACY PROTECTOR";
-    message =
-      "Excellent work. You made thoughtful choices about data collection, access, and transparency. Keep questioning whether information is truly necessary.";
-  } else if (score >= 65) {
-    rank = "DIGITAL DETECTIVE";
-    message =
-      "Good investigation. You spotted several privacy risks. Review the cases where you lost points to strengthen your data-protection decisions.";
-  } else if (score >= 40) {
-    rank = "PRIVACY TRAINEE";
-    message =
-      "You have the beginnings of a good investigation. Remember to limit data collection, question permissions, and make privacy promises meaningful.";
+  if (state.trust >= 80) {
+    rank = "TRUST BUILDER";
+    summary = "You made strong privacy-conscious decisions.";
+  } else if (state.trust >= 55) {
+    rank = "CAREFUL BUILDER";
+    summary = "Your app has a solid start, but some decisions deserve another look.";
   } else {
-    rank = "CASE STILL OPEN";
-    message =
-      "Every investigation is a chance to learn. Play again, follow the clues, and look for the smallest amount of information each feature needs.";
+    rank = "BUILD REVIEW";
+    summary = "This case shows why privacy and security need to be part of design from the beginning.";
   }
 
-  $("result-heading").textContent = "Investigation complete.";
-  $("result-rank").textContent = rank;
-  $("result-message").textContent =
-    `${message} Your final score is ${score} out of ${maxScore}.`;
+  $("#rank-stamp").textContent = rank;
+  $("#final-summary").textContent = summary;
+
+  const strengths = $("#strength-list");
+  strengths.innerHTML = "";
+
+  if (!state.evidence.length) {
+    strengths.innerHTML = "<li>No evidence was recorded.</li>";
+  } else {
+    state.evidence.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      strengths.appendChild(li);
+    });
+  }
+
+  const reviewItems = [];
+
+  if (!state.wordSolved) {
+    reviewItems.push("Authentication needs strong, secure protections.");
+  }
+
+  if (state.choices.access !== "limited") {
+    reviewItems.push("Use least privilege and time-limited access for contractors.");
+  }
+
+  if (state.choices.incident !== "stop") {
+    reviewItems.push("Contain unnecessary sharing, investigate, and follow appropriate incident procedures.");
+  }
+
+  if (
+    !state.cordSelection.length ||
+    state.cordSelection.some((id) => !cords.find((cord) => cord.id === id)?.needed) ||
+    !hasCompletePath(state.cordSelection)
+  ) {
+    reviewItems.push("Review the difference between necessary data flows and unnecessary collection.");
+  }
+
+  if (state.quizScore < 3) {
+    reviewItems.push("Review data minimization, least privilege, incident response, and the FTC Act.");
+  }
+
+  if (!reviewItems.length) {
+    reviewItems.push("Keep documenting data flows, reviewing permissions, and testing your privacy decisions.");
+  }
+
+  const reviewList = $("#review-list");
+  reviewList.innerHTML = "";
+
+  reviewItems.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    reviewList.appendChild(li);
+  });
+
+  $("#quiz-result").textContent = `${state.quizScore}/${quizQuestions.length} correct`;
+  $("#quiz-summary").textContent =
+    state.quizScore === quizQuestions.length
+      ? "Excellent — you understood all four review questions."
+      : "Review the explanations from the quiz to strengthen your understanding.";
 }
 
-buildWordleBoard();
-buildKeyboard();
-buildReview();
-updateProgress();
+$("#start-button").addEventListener("click", startGame);
+$("#replay-button").addEventListener("click", startGame);
+
+$("#home-link").addEventListener("click", (event) => {
+  event.preventDefault();
+  showScreen("intro");
+});
